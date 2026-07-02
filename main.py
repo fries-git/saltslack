@@ -4,7 +4,7 @@ import requests
 import threading
 import time
 
-# In seconds, how often to check for new commit
+# In seconds, how often to check for new commits
 interval = 60
 
 env.load_dotenv()
