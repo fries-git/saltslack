@@ -17,7 +17,7 @@ def normalize_repo(text):
 
 def is_valid_repo(repo):
     url = f"https://api.github.com/repos/{repo}"
-    response = requests.get(url, headers=headers, timeout=10)
+    response = requests.get(url, timeout=10)
     return response.status_code == 200
 
 app = App(token = str(xoxbtoken))
