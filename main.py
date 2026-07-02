@@ -57,6 +57,8 @@ def track(ack, body, respond):
             "repo": repo,
             "user": user_id  # store the Slack user ID, not the username
         })
+    
+    checkrepos()  # Check for new commits immediately after tracking a new repo
 
 @app.command("/untrackrepo")
 def untrack(ack, body, respond):
