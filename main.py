@@ -1,13 +1,19 @@
 import os
 import dotenv as env
 import requests
-import json
+import threading
+import time
+
+# In seconds, how often to check for new commits
+interval = 60
 
 env.load_dotenv()
 tracked = []
 latestsave = []
 xapptoken = os.getenv("xapptoken")
 xoxbtoken = os.getenv("xoxbtoken")
+token = os.getenv("token")
+headers = {"Authorization": f"Bearer {token}"}
 
 from slack_bolt import App
 from slack_bolt.adapter.socket_mode import SocketModeHandler
@@ -17,11 +23,10 @@ def normalize_repo(text):
 
 def is_valid_repo(repo):
     url = f"https://api.github.com/repos/{repo}"
-    response = requests.get(url, timeout=10)
+    response = requests.get(url, headers=headers, timeout=10)
     return response.status_code == 200
 
 app = App(token = str(xoxbtoken))
-
 @app.command("/trackrepo")
 def track(ack, body, respond):
     ack()
@@ -113,6 +118,13 @@ def checkrepos():
                 channel=item["user"],
                 text=update
             )
+
+def repo_checker():
+    while True:
+        checkrepos()
+        time.sleep(interval)
+
+threading.Thread(target=repo_checker, daemon=True).start()
 
 handler = SocketModeHandler(app, str(xapptoken))
 handler.start()
