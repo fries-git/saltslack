@@ -4,8 +4,8 @@ import requests
 import json
 
 env.load_dotenv()
-repos = []
-latest_commits = {}
+tracked = []
+latestsave = []
 xapptoken = os.getenv("xapptoken")
 xoxbtoken = os.getenv("xoxbtoken")
 
@@ -26,6 +26,18 @@ app = App(token = str(xoxbtoken))
 def command(ack, body, respond):
     ack()
     repo = normalize_repo(body["text"].strip())
+    user_id = body["user_id"]
+    user_info = app.client.users_info(user=user_id)
+
+    if user_info["ok"]:
+        user_name = user_info["user"]["name"]
+        print(f"User {user_name} is now tracking repository: {repo}")
+
+    else:
+        respond(f"Failed to retrieve user info for user ID: {user_id}")
+        print(f"Failed to retrieve user info for user ID: {user_id}")
+        return
+    
     if not repo:
         respond("Please provide a repository link to track.")
         return
@@ -33,53 +45,75 @@ def command(ack, body, respond):
     if not is_valid_repo(repo):
         respond(f"`{repo}` is not a valid GitHub repository.")
         return
+    
     else:
         respond(f"Tracking repository: {repo}")
-        repos.append(repo)
+        tracked.append({
+            "repo": repo,
+            "user": user_id  # store the Slack user ID, not the username
+        })
 
+@app.command("/untrackrepo")
+def command(ack, body, respond):
+    ack()
+    repo = normalize_repo(body["text"].strip())
     user_id = body["user_id"]
+    
+    if not repo:
+        respond("Please provide a repository link to untrack.")
+        return
+    
+    for item in tracked:
+        if item["repo"] == repo and item["user"] == user_id:
+            tracked.remove(item)
+            respond(f"Stopped tracking repository: {repo}")
+            return
+    
+    respond(f"You are not tracking repository: {repo}")
 
 @app.command("/updaterepos")
 def command(ack, body, respond):
     ack()
-    respond(checkrepos())
+    checkrepos()
 
 @app.event("message")
 def handle_message_events(body, logger):
     logger.info(body)
 
+latestcommits = {}
+
+def checkrepo(repo):
+    url = f"https://api.github.com/repos/{repo}/commits"
+    response = requests.get(url, timeout=10)
+    if response.status_code != 200:
+        return None
+    data = response.json()
+    if not data:
+        return None
+    latest = data[0]
+    sha = latest["sha"]
+    if repo not in latestcommits:
+        latestcommits[repo] = sha
+        return None  # First run, don't notify
+    if latestcommits[repo] != sha:
+        latestcommits[repo] = sha
+        return (
+            f"New commit detected in {repo}\n"
+            f"{latest['commit']['message']}\n"
+            f"{latest['html_url']}"
+        )
+
+    return None
+
 def checkrepos():
-    updates = []
+    for item in tracked:
+        update = checkrepo(item["repo"])
 
-    for repo in repos:
-        url = f"https://api.github.com/repos/{repo}/commits"
-        response = requests.get(url, timeout=10)
-
-        if response.status_code != 200:
-            updates.append(f"Error fetching commits for {repo}")
-            continue
-
-        data = response.json()
-        if not data:
-            continue
-
-        latest_sha = data[0]["sha"]
-
-        if repo not in latest_commits:
-            latest_commits[repo] = latest_sha
-            continue  # first time setup, no alert
-
-        if latest_sha != latest_commits[repo]:
-            latest_commits[repo] = latest_sha
-
-            commit = data[0]
-            updates.append(
-                f"New commit in {repo}\n"
-                f"Message: {commit['commit']['message']}\n"
-                f"{commit['html_url']}"
+        if update:
+            app.client.chat_postMessage(
+                channel=item["user"],
+                text=update
             )
-
-    return "\n\n".join(updates) if updates else "No new commits."
 
 checkrepos()
 handler = SocketModeHandler(app, str(xapptoken))
