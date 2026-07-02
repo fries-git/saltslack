@@ -17,13 +17,13 @@ def normalize_repo(text):
 
 def is_valid_repo(repo):
     url = f"https://api.github.com/repos/{repo}"
-    response = requests.get(url, timeout=10)
+    response = requests.get(url, headers=headers, timeout=10)
     return response.status_code == 200
 
 app = App(token = str(xoxbtoken))
 
 @app.command("/trackrepo")
-def command(ack, body, respond):
+def track(ack, body, respond):
     ack()
     repo = normalize_repo(body["text"].strip())
     user_id = body["user_id"]
@@ -54,7 +54,7 @@ def command(ack, body, respond):
         })
 
 @app.command("/untrackrepo")
-def command(ack, body, respond):
+def untrack(ack, body, respond):
     ack()
     repo = normalize_repo(body["text"].strip())
     user_id = body["user_id"]
@@ -72,7 +72,7 @@ def command(ack, body, respond):
     respond(f"You are not tracking repository: {repo}")
 
 @app.command("/updaterepos")
-def command(ack, body, respond):
+def update(ack, body, respond):
     ack()
     checkrepos()
 
@@ -108,13 +108,11 @@ def checkrepo(repo):
 def checkrepos():
     for item in tracked:
         update = checkrepo(item["repo"])
-
         if update:
             app.client.chat_postMessage(
                 channel=item["user"],
                 text=update
             )
 
-checkrepos()
 handler = SocketModeHandler(app, str(xapptoken))
 handler.start()
