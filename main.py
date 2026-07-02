@@ -118,7 +118,7 @@ def checkrepos():
                 channel=item["user"],
                 text=update
             )
-
+        time.sleep(.5)
 def repo_checker():
     while True:
         checkrepos()
