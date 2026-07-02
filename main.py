@@ -89,7 +89,7 @@ latestcommits = {}
 
 def checkrepo(repo):
     url = f"https://api.github.com/repos/{repo}/commits"
-    response = requests.get(url, timeout=10)
+    response = requests.get(url, headers=headers, timeout=10)
     if response.status_code != 200:
         return None
     data = response.json()
